@@ -954,29 +954,29 @@ jobs:
         config:
           - {name: "Mission", test_file: "mavros_posix_test_mission.test", params: "mission:=MC_mission_box vehicle:=iris"}
           - {name: "Offboard", test_file: "mavros_posix_tests_offboard_posctl.test", params: "vehicle:=iris"}
-    container:
-      image: px4io/px4-dev-ros-melodic:2021-09-08
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Git ownership workaround
-        run: git config --system --add safe.directory '*'
-
-      - name: Build SITL and Gazebo
-        shell: bash
-        run: |
-          . /opt/ros/melodic/setup.bash
-          make px4_sitl_default
-          make px4_sitl_default sitl_gazebo-classic
-
-      - name: Run MAVROS tests
-        shell: bash
-        run: |
-          . /opt/ros/melodic/setup.bash
-          test/rostest_px4_run.sh ${{ matrix.config.test_file }} ${{ matrix.config.params }}
-        timeout-minutes: 30
+      # Use docker-run-action instead of container: at job level because:
+      # - ROS Melodic container is based on Ubuntu 18.04 (GLIBC 2.27)
+      # - GitHub Actions' container: support injects Node 20 which requires GLIBC 2.28+
+      # - docker-run-action runs the container separately, avoiding GLIBC compatibility issues
+      # - This approach is future-proof as GitHub updates Node versions
+      # TODO: Migrate to a newer ROS container with latest Ubuntu that meets GLIBC requirements
+      #       to use native container support and simplify the workflow configuration
+      - name: Build and Test in Docker
+        uses: addnab/docker-run-action@v3
+        with:
+          image: px4io/px4-dev-ros-melodic:2021-09-08
+          options: -v ${{ github.workspace }}:/workspace
+          run: |
+            cd /workspace
+            git config --global --add safe.directory /workspace
+            make px4_sitl_default
+            make px4_sitl_default sitl_gazebo-classic
+            ./test/rostest_px4_run.sh ${{ matrix.config.test_file }} ${{ matrix.config.params }}
 
   ros-translation-node:
     name: ROS Translation Node [${{ matrix.config.ros_version }}]
