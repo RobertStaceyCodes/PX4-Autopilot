@@ -735,10 +735,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Git Ownership Workaround
+      - name: Setup - Configure Git Safe Directory
         run: git config --system --add safe.directory '*'
 
-      - name: Cache Restore
+      - name: Cache - Restore ccache
         uses: actions/cache/restore@v4
         with:
           path: ~/.ccache
@@ -747,7 +747,7 @@ jobs:
             sitl-ccache-${{ github.base_ref || github.ref_name }}-
             sitl-ccache-
 
-      - name: Cache Conf Config
+      - name: Cache - Configure ccache (250M, compression level 6)
         run: |
           mkdir -p ~/.ccache
           echo "base_dir = ${GITHUB_WORKSPACE}" > ~/.ccache/ccache.conf
@@ -758,29 +758,29 @@ jobs:
           ccache -s
           ccache -z
 
-      - name: Build PX4
+      - name: Build - PX4 Firmware (SITL)
         env:
           PX4_CMAKE_BUILD_TYPE: ${{matrix.config.build_type}}
         run: make px4_sitl_default
 
-      - name: Cache Post-Run [px4_sitl_default]
+      - name: Cache - Stats after PX4 Firmware
         run: ccache -s
 
-      - name: Build SITL Gazebo
+      - name: Build - Gazebo Classic Plugins
         env:
           PX4_CMAKE_BUILD_TYPE: ${{matrix.config.build_type}}
         run: make px4_sitl_default sitl_gazebo-classic
 
-      - name: Cache Post-Run [sitl_gazebo-classic]
+      - name: Cache - Stats after Gazebo Plugins
         run: ccache -s
 
-      - name: Download MAVSDK
+      - name: Setup - Download MAVSDK Library
         run: wget "https://github.com/mavlink/MAVSDK/releases/download/v$(cat test/mavsdk_tests/MAVSDK_VERSION)/libmavsdk-dev_$(cat test/mavsdk_tests/MAVSDK_VERSION)_ubuntu20.04_amd64.deb"
 
-      - name: Install MAVSDK
+      - name: Setup - Install MAVSDK Library
         run: dpkg -i "libmavsdk-dev_$(cat test/mavsdk_tests/MAVSDK_VERSION)_ubuntu20.04_amd64.deb"
 
-      - name: Check PX4 Environment Variables
+      - name: Setup - Verify Environment Variables
         env:
           PX4_HOME_LAT: ${{matrix.config.latitude}}
           PX4_HOME_LON: ${{matrix.config.longitude}}
@@ -790,21 +790,21 @@ jobs:
           export
           ulimit -a
 
-      - name: Build PX4 / MAVSDK tests
+      - name: Build - MAVSDK Integration Tests
         env:
           PX4_CMAKE_BUILD_TYPE: ${{matrix.config.build_type}}
           DONT_RUN: 1
         run: make px4_sitl_default sitl_gazebo-classic mavsdk_tests
 
-      - name: Cache Post-Run [px4_sitl_default sitl_gazebo-classic mavsdk_tests]
+      - name: Cache - Stats after MAVSDK Tests Build
         run: ccache -s
 
-      - name: Core Dump Settings
+      - name: Setup - Enable Core Dumps for Crash Analysis
         run: |
           ulimit -c unlimited
           echo "`pwd`/%e.core" > /proc/sys/kernel/core_pattern
 
-      - name: Run SITL / MAVSDK Tests
+      - name: Test - Run SITL MAVSDK Integration Tests
         env:
           PX4_HOME_LAT: ${{matrix.config.latitude}}
           PX4_HOME_LON: ${{matrix.config.longitude}}
@@ -813,7 +813,7 @@ jobs:
         run: test/mavsdk_tests/mavsdk_test_runner.py --speed-factor 10 --abort-early --model ${{matrix.config.model}} test/mavsdk_tests/configs/sitl.json --verbose --force-color
         timeout-minutes: 45
 
-      - name: Upload failed logs
+      - name: Upload - Failed Test Logs and Flight Logs
         if: failure()
         uses: actions/upload-artifact@v4
         with:
@@ -838,44 +838,41 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Git Ownership Workaround
+      - name: Setup - Configure Git Safe Directory
         run: git config --system --add safe.directory '*'
 
-      - name: Update ROS Keys
+      - name: Setup - Update ROS 2 Galactic Package Keys
         run: |
           sudo rm /etc/apt/sources.list.d/ros2.list && \
           sudo curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg && \
           echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | sudo tee /etc/apt/sources.list.d/ros2.list > /dev/null
 
-      - name: Install gazebo
+      - name: Setup - Install Gazebo 11 and GStreamer Plugins
         run: apt update && apt install -y gazebo11 libgazebo11-dev gstreamer1.0-plugins-bad gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-ugly libgstreamer-plugins-base1.0-dev
 
-      - name: Prepare ccache timestamp
-        id: ccache_cache_timestamp
-        shell: cmake -P {0}
-        run: |
-          string(TIMESTAMP current_date "%Y-%m-%d-%H;%M;%S" UTC)
-          message("::set-output name=timestamp::${current_date}")
-
-      - name: ccache cache files
-        uses: actions/cache@v4
+      - name: Cache - Restore ccache
+        id: cache_restore
+        uses: actions/cache/restore@v4
         with:
           path: ~/.ccache
-          key: ros_integration_tests-ccache-${{steps.ccache_cache_timestamp.outputs.timestamp}}
-          restore-keys: ros_integration_tests-ccache-
+          key: ros-integration-ccache-${{ github.sha }}
+          restore-keys: |
+            ros-integration-ccache-${{ github.base_ref || github.ref_name }}-
+            ros-integration-ccache-
 
-      - name: Setup ccache
+      - name: Cache - Configure ccache (500M, compression level 6)
         run: |
           mkdir -p ~/.ccache
           echo "base_dir = ${GITHUB_WORKSPACE}" > ~/.ccache/ccache.conf
           echo "compression = true" >> ~/.ccache/ccache.conf
           echo "compression_level = 6" >> ~/.ccache/ccache.conf
-          echo "max_size = 300M" >> ~/.ccache/ccache.conf
+          echo "max_size = 500M" >> ~/.ccache/ccache.conf
           echo "hash_dir = false" >> ~/.ccache/ccache.conf
+          echo "compiler_check = content" >> ~/.ccache/ccache.conf
           ccache -s
           ccache -z
 
-      - name: Get and build micro-xrce-dds-agent
+      - name: Build - Micro-XRCE-DDS Agent (v2.2.1)
         run: |
           cd /opt
           git clone --recursive https://github.com/eProsima/Micro-XRCE-DDS-Agent.git
@@ -887,10 +884,10 @@ jobs:
           cmake ..
           make -j2
 
-      - name: ccache post-run micro-xrce-dds-agent
+      - name: Cache - Stats after Micro-XRCE-DDS Agent
         run: ccache -s
 
-      - name: Get and build the ros2 interface library
+      - name: Build - PX4 ROS 2 Interface Library
         shell: bash
         run: |
           PX4_DIR="$(pwd)"
@@ -903,27 +900,27 @@ jobs:
           rm -rf src/translation_node src/px4_msgs_old
           colcon build --symlink-install
 
-      - name: ccache post-run ros workspace
+      - name: Cache - Stats after ROS 2 Interface Library
         run: ccache -s
 
-      - name: Build PX4
+      - name: Build - PX4 Firmware (SITL)
         run: make px4_sitl_default
 
-      - name: ccache post-run px4/firmware
+      - name: Cache - Stats after PX4 Firmware
         run: ccache -s
 
-      - name: Build SITL Gazebo
+      - name: Build - Gazebo Classic Plugins
         run: make px4_sitl_default sitl_gazebo-classic
 
-      - name: ccache post-run sitl_gazebo-classic
+      - name: Cache - Stats after Gazebo Plugins
         run: ccache -s
 
-      - name: Core dump settings
+      - name: Setup - Enable Core Dumps for Crash Analysis
         run: |
           ulimit -c unlimited
           echo "`pwd`/%e.core" > /proc/sys/kernel/core_pattern
 
-      - name: Run tests
+      - name: Test - Run ROS 2 Integration Tests (Iris model)
         shell: bash
         run: |
           . /opt/px4_ws/install/setup.bash
@@ -931,7 +928,18 @@ jobs:
           test/ros_test_runner.py --verbose --model iris --upload --force-color
         timeout-minutes: 45
 
-      - name: Upload failed logs
+      - name: Cache - Final Stats Summary
+        if: always()
+        run: ccache -s
+
+      - name: Cache - Save ccache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.ccache
+          key: ${{ steps.cache_restore.outputs.cache-primary-key }}
+
+      - name: Upload - Failed Test Logs and Flight Logs
         if: failure()
         uses: actions/upload-artifact@v4
         with:
@@ -964,7 +972,7 @@ jobs:
       # - This approach is future-proof as GitHub updates Node versions
       # TODO: Migrate to a newer ROS container with latest Ubuntu that meets GLIBC requirements
       #       to use native container support and simplify the workflow configuration
-      - name: Build and Test in Docker
+      - name: Build and Test - MAVROS ${{ matrix.config.name }} Tests
         uses: addnab/docker-run-action@v3
         with:
           image: px4io/px4-dev-ros-melodic:2021-09-08
@@ -997,21 +1005,21 @@ jobs:
         with:
           required-ros-distributions: ${{ matrix.config.ros_version }}
 
-      - name: Checkout repository
+      - name: Setup - Checkout Repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Git ownership workaround
+      - name: Setup - Configure Git Safe Directory
         run: git config --system --add safe.directory '*'
 
-      - name: Check .msg file versioning
+      - name: Validate - Check Message File Versioning
         if: github.event_name == 'pull_request'
         shell: bash
         run: |
           ./Tools/ci/check_msg_versioning.sh ${{ github.event.pull_request.base.sha }} ${{github.event.pull_request.head.sha}}
 
-      - name: Build and test
+      - name: Build and Test - Translation Node Unit Tests
         shell: bash
         run: |
           ros_ws=/ros_ws
