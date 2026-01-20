@@ -228,3 +228,10 @@ subscriptions:
 
 # Create uORB::PublicationMulti
 subscriptions_multi:
+  - type: px4_msgs::msg::AuxGlobalPosition
+    uorb_topic: aux_global_position
+    ros_topics:
+      - /fmu/in/aux_global_position_A
+      - /fmu/in/aux_global_position_B
+      - /fmu/in/aux_global_position_C
+      - /fmu/in/aux_global_position_D
