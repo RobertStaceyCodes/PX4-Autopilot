@@ -175,6 +175,10 @@ private:
 	matrix::Vector3f _triplet_current; ///< current waypoint in triplet from navigator
 	matrix::Vector3f _triplet_next; ///< next waypoint in triplet from navigator
 
+	matrix::Vector3f _mission_line_rejoin_target; ///< Intermediate target to rejoin mission line
+	bool _need_to_rejoin_mission_line{false}; ///< True when vehicle should first fly back to mission line
+	bool _just_activated{false}; ///< True after activation, triggers one-time rejoin check
+
 	hrt_abstime _time_last_cruise_speed_override{0}; ///< timestamp the cruise speed was last time overridden using DO_CHANGE_SPEED
 
 	MapProjection _reference_position{}; /**< Class used to project lat/lon setpoint into local frame. */
@@ -190,4 +194,5 @@ private:
 	bool _isFinite(const position_setpoint_s &sp); /**< Checks if all waypoint triplets are finite. */
 	bool _evaluateGlobalReference(); /**< Check is global reference is available. */
 	void _set_heading_from_mode(); /**< @see  MPC_YAW_MODE */
+	void _checkIfNeedToRejoinMissionLine(); /**< Check if vehicle is far from mission line and needs to rejoin */
 };

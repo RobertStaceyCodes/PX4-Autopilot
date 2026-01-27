@@ -75,6 +75,10 @@ bool FlightTaskAuto::activate(const trajectory_setpoint_s &last_setpoint)
 	_is_emergency_braking_active = false;
 	_time_last_cruise_speed_override = 0;
 
+	// Mark that we just activated - this will trigger a one-time rejoin check
+	_just_activated = true;
+	_need_to_rejoin_mission_line = false;
+
 	return ret;
 }
 
@@ -154,6 +158,19 @@ bool FlightTaskAuto::update()
 		_position_setpoint = _triplet_current;
 		_velocity_setpoint.setNaN();
 		break;
+	}
+
+	// If we need to rejoin the mission line, overwrite the position setpoint
+	if (_need_to_rejoin_mission_line) {
+		_position_setpoint = _mission_line_rejoin_target;
+
+		// Check if we've reached the rejoin point (within acceptance radius)
+		const float distance_to_rejoin_target = Vector2f(_mission_line_rejoin_target - _position).norm();
+
+		if (distance_to_rejoin_target < _target_acceptance_radius) {
+			// Reached the line, can now proceed to actual mission waypoint
+			_need_to_rejoin_mission_line = false;
+		}
 	}
 
 	_checkEmergencyBraking();
@@ -481,6 +498,12 @@ bool FlightTaskAuto::_evaluatePositionSetpointTriplet()
 		}
 	}
 
+	// On first triplet update after activation, check if we need to rejoin mission line
+	if (_just_activated) {
+		_checkIfNeedToRejoinMissionLine();
+		_just_activated = false;
+	}
+
 	return true;
 }
 
@@ -745,6 +768,64 @@ bool FlightTaskAuto::_highEnoughForLandingGear()
 {
 	// return true if altitude is above two meters
 	return _dist_to_ground > 2.0f;
+}
+
+void FlightTaskAuto::_checkIfNeedToRejoinMissionLine()
+{
+
+	// Only check once when flag is not already set
+	// This ensures we don't continuously recalculate during flight
+	if (_need_to_rejoin_mission_line) {
+		return;
+	}
+
+	// Don't apply to landing, loiter, or idle - these don't follow lines
+	if (_type == WaypointType::land || _type == WaypointType::loiter || _type == WaypointType::idle) {
+		return;
+	}
+
+	// Verify we have valid triplet data
+	if (!_triplet_previous.isAllFinite() || !_triplet_current.isAllFinite()) {
+		return;
+	}
+
+	// Calculate the mission line from previous to current waypoint
+	const Vector3f prev_to_current = _triplet_current - _triplet_previous;
+	const Vector3f prev_to_current_unit = prev_to_current.unit_or_zero();
+
+	// If previous and current waypoints are the same, there's no line to follow
+	if (!prev_to_current_unit.longerThan(FLT_EPSILON)) {
+		return;
+	}
+
+	// Find the closest point on the mission line to the vehicle
+	const Vector3f prev_to_vehicle = _position - _triplet_previous;
+	const float projection = prev_to_vehicle * prev_to_current_unit;
+	const Vector3f closest_point = _triplet_previous + prev_to_current_unit * projection;
+
+	// Calculate perpendicular distance from vehicle to the mission line
+	const float distance_to_line = Vector2f(_position - closest_point).norm();
+
+	// Only redirect if significantly off the line (beyond acceptance radius)
+	if (distance_to_line > _target_acceptance_radius) {
+		// Check where the closest point is relative to the waypoints
+		const float line_length = prev_to_current.norm();
+
+		if (projection < 0.0f) {
+			// Vehicle is behind the previous waypoint: go to previous waypoint first
+			_mission_line_rejoin_target = _triplet_previous;
+			_need_to_rejoin_mission_line = true;
+
+		} else if (projection > line_length) {
+			// Vehicle is past the current waypoint: go directly to current (shortcut)
+			// No rejoin needed - normal mission progression will handle this
+
+		} else {
+			// Vehicle is off-track between waypoints: rejoin at closest point on line
+			_mission_line_rejoin_target = closest_point;
+			_need_to_rejoin_mission_line = true;
+		}
+	}
 }
 
 void FlightTaskAuto::updateParams()
