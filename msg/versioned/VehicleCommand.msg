@@ -114,6 +114,14 @@ uint16 VEHICLE_CMD_EXTERNAL_WIND_ESTIMATE = 43004
 uint32 VEHICLE_CMD_PX4_INTERNAL_START = 65537 # Start of PX4 internal only vehicle commands (> UINT16_MAX).
 uint32 VEHICLE_CMD_SET_GPS_GLOBAL_ORIGIN = 100000 # Sets the GPS coordinates of the vehicle local origin (0,0,0) position. |Unused|Unused|Unused|Unused|Latitude (WGS-84)|Longitude (WGS-84)|[m] Altitude (AMSL from GNSS, positive above ground)|
 uint32 VEHICLE_CMD_SET_NAV_STATE = 100001 # Change mode by specifying nav_state directly. |nav_state|Unused|Unused|Unused|Unused|Unused|Unused|
+uint32 VEHICLE_CMD_SET_EKF_SENSOR_FUSION = 100002 # Enable/disable EKF sensor fusion. |source (FUSION_SOURCE_*)|instance (0-based)|action (0=disable, 1=enable)|Unused|Unused|Unused|Unused|
+
+# Sensor fusion source types for VEHICLE_CMD_SET_EKF_SENSOR_FUSION
+uint8 FUSION_SOURCE_GPS = 1
+uint8 FUSION_SOURCE_OF = 2   # Optical Flow
+uint8 FUSION_SOURCE_EV = 3   # External Vision
+uint8 FUSION_SOURCE_AGP0 = 4 # Auxiliary Global Position instance 0
+uint8 FUSION_SOURCE_AGP1 = 5 # Auxiliary Global Position instance 1
 
 uint8 VEHICLE_MOUNT_MODE_RETRACT = 0 # Load and keep safe position (Roll,Pitch,Yaw) from permanent memory and stop stabilization.
 uint8 VEHICLE_MOUNT_MODE_NEUTRAL = 1 # Load and keep neutral position (Roll,Pitch,Yaw) from permanent memory.
