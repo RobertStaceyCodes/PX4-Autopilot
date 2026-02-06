@@ -150,6 +150,12 @@ public:
 	 */
 	int modeExecutorInCharge() const;
 
+	/**
+	 * Navigation state owned by the mode executor in charge
+	 * Returns 0 if autopilot is in charge or mode executor invalid
+	 */
+	uint8_t getModeExecutorNavState() const;
+
 	void onUserIntendedNavStateChange(ModeChangeSource source, uint8_t user_intended_nav_state) override;
 	uint8_t getReplacedModeIfAny(uint8_t nav_state) override;
 
@@ -208,6 +214,7 @@ public:
 	void setFailsafeState(bool failsafe_action_active) {}
 
 	int modeExecutorInCharge() const { return ModeExecutors::AUTOPILOT_EXECUTOR_ID; }
+	uint8_t getModeExecutorNavState() const { return 0; }
 
 	void onUserIntendedNavStateChange(ModeChangeSource source, uint8_t user_intended_nav_state) override {}
 	uint8_t getReplacedModeIfAny(uint8_t nav_state) override { return nav_state; }

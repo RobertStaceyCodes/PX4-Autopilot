@@ -2411,6 +2411,7 @@ bool Commander::handleModeIntentionAndFailsafe()
 	_vehicle_status.nav_state = _mode_management.getNavStateReplacementIfValid(FailsafeBase::modeFromAction(
 					    _failsafe.selectedAction(), _user_mode_intention.get()));
 	_vehicle_status.executor_in_charge = _mode_management.modeExecutorInCharge(); // Set this in sync with nav_state
+	_vehicle_status.executor_nav_state = _mode_management.getModeExecutorNavState();
 
 	switch (_failsafe.selectedAction()) {
 	case FailsafeBase::Action::Disarm:

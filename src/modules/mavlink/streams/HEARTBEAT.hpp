@@ -99,9 +99,14 @@ private:
 				base_mode |= MAV_MODE_FLAG_AUTO_ENABLED | MAV_MODE_FLAG_STABILIZE_ENABLED | MAV_MODE_FLAG_GUIDED_ENABLED;
 			}
 
+			uint8_t nav_state = vehicle_status.nav_state;
+
+			if (vehicle_status.executor_nav_state != 0) {
+				nav_state = vehicle_status.executor_nav_state;
+			}
 
 			// uint32_t custom_mode - A bitfield for use for autopilot-specific flags
-			union px4_custom_mode custom_mode {get_px4_custom_mode(vehicle_status.nav_state)};
+			union px4_custom_mode custom_mode {get_px4_custom_mode(nav_state)};
 
 
 			// uint8_t system_status (MAV_STATE) - System status flag.
