@@ -183,6 +183,10 @@ void UavcanRGBController::periodic_update(const uavcan::TimerEvent &)
 		case LightFunction::StatusOrWhiteNavigation:
 			cmd.color = light_mode_active ? rgb888_to_rgb565(brightness, brightness, brightness) : status_color;
 			break;
+
+		case LightFunction::StatusOrOff:
+			cmd.color = light_mode_active ? rgb888_to_rgb565(0, 0, 0) : status_color;
+			break;
 		}
 
 		light_command.commands.push_back(cmd);

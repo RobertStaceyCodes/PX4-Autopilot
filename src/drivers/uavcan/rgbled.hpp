@@ -67,7 +67,8 @@ private:
 		StatusOrAntiCollision = 5,     // Status when LGT_MODE inactive, white beacon when active
 		StatusOrRedNavigation = 6,     // Status when LGT_MODE inactive, red nav when active
 		StatusOrGreenNavigation = 7,   // Status when LGT_MODE inactive, green nav when active
-		StatusOrWhiteNavigation = 8    // Status when LGT_MODE inactive, white nav when active
+		StatusOrWhiteNavigation = 8,   // Status when LGT_MODE inactive, white nav when active
+		StatusOrOff = 9                // Status when LGT_MODE inactive, off when active
 	};
 
 	enum class LightMode : uint8_t {

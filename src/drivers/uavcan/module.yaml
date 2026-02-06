@@ -60,7 +60,7 @@ parameters:
       num_instances: *max_num_uavcan_lights
       instance_start: 0
       min: 0
-      max: 8
+      max: 9
       default: 0
       values:
         0: Status
@@ -72,6 +72,7 @@ parameters:
         6: Status / Red Navigation
         7: Status / Green Navigation
         8: Status / White Navigation
+        9: Status / Off
 actuator_output:
   show_subgroups_if: 'UAVCAN_ENABLE>=3'
   config_parameters:
