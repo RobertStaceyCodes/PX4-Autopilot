@@ -199,17 +199,14 @@ UavcanEscController::get_failures(uint8_t esc_index)
 	dronecan_node_status_s node_status {};
 	uint8_t node_health{dronecan_node_status_s::HEALTH_OK};
 	uint16_t vendor_specific_status_code{0};
-	bool have_node_status{false};
 
 	if (_dronecan_node_status_sub.copy(&node_status)
 	    && esc_report.esc_address < kMaxUavcanNodeId
 	    && node_status.node_id == esc_report.esc_address) {
 		node_health = node_status.health;
 		vendor_specific_status_code = node_status.vendor_specific_status_code;
-		have_node_status = true;
-	}
 
-	if (!have_node_status) {
+	} else  {
 		return esc_report.failures;
 	}
 
