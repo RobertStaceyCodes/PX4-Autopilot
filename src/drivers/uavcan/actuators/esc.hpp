@@ -66,6 +66,7 @@ class UavcanEscController
 {
 public:
 	static constexpr int MAX_ACTUATORS = esc_status_s::CONNECTED_ESC_MAX;
+	static constexpr int ESC_NAME_LEN = 80;
 	static constexpr unsigned MAX_RATE_HZ = 400;
 	static constexpr int16_t UAVCAN_NODE_ID_MAX = 128; // UAVCAN supports up to 128 nodes (0-127)
 
@@ -129,6 +130,8 @@ private:
 	uORB::PublicationMulti<esc_status_s> _esc_status_pub{ORB_ID(esc_status)};
 	uORB::SubscriptionMultiArray<dronecan_node_status_s, ORB_MULTI_MAX_INSTANCES> _dronecan_node_status_subs{ORB_ID::dronecan_node_status};
 	uORB::Subscription _device_information_sub{ORB_ID(device_information)};
+
+	char _esc_name_cache[MAX_ACTUATORS][ESC_NAME_LEN] {};
 
 	uint8_t		_rotor_count{0};
 

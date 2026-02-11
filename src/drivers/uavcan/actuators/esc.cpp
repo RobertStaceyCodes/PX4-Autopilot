@@ -38,6 +38,7 @@
  */
 
 #include "esc.hpp"
+#include <inttypes.h>
 #include <systemlib/err.h>
 #include <parameters/param.h>
 #include <drivers/drv_hrt.h>
@@ -126,6 +127,7 @@ UavcanEscController::esc_status_sub_cb(const uavcan::ReceivedDataStructure<uavca
 		// esc_report.motor_temperature is filled in the extended status callback
 		esc_report.esc_rpm = msg.rpm;
 		esc_report.esc_errorcount = msg.error_count;
+		esc_report.failures = get_failures(msg.esc_index);
 
 		_esc_status.esc_count = _rotor_count;
 		_esc_status.counter += 1;
@@ -133,7 +135,6 @@ UavcanEscController::esc_status_sub_cb(const uavcan::ReceivedDataStructure<uavca
 		_esc_status.esc_online_flags = check_escs_status();
 		_esc_status.esc_armed_flags = (1 << _rotor_count) - 1;
 		_esc_status.timestamp = hrt_absolute_time();
-		esc_report.failures = get_failures(msg.esc_index);
 
 		_esc_status_pub.publish(_esc_status);
 	}
@@ -178,17 +179,21 @@ UavcanEscController::check_escs_status()
 uint32_t UavcanEscController::get_failures(uint8_t esc_index)
 {
 	esc_report_s &esc_report = _esc_status.esc[esc_index];
+	uint32_t failures = 0;
 
 	// Update device vendor/model information from device_information topic
 	device_information_s device_information;
-	char esc_name[80] {};
 
-	if (_device_information_sub.copy(&device_information)
+	// device_information is published intermittently and for different device_ids.
+	// Cache the last known name per ESC index to avoid losing vendor detection.
+	if (_device_information_sub.update(&device_information)
 	    && device_information.device_type == device_information_s::DEVICE_TYPE_ESC
-	    && device_information.device_id == esc_index) {
-		strncpy(esc_name, device_information.name, sizeof(esc_name) - 1);
-		esc_name[sizeof(esc_name) - 1] = '\0';
+	    && device_information.device_id < MAX_ACTUATORS) {
+		strncpy(_esc_name_cache[device_information.device_id], device_information.name, ESC_NAME_LEN - 1);
+		_esc_name_cache[device_information.device_id][ESC_NAME_LEN - 1] = '\0';
 	}
+
+	const char *esc_name = _esc_name_cache[esc_index];
 
 	// Update node health from all available dronecan_node_status messages
 	dronecan_node_status_s node_status {};
@@ -207,9 +212,9 @@ uint32_t UavcanEscController::get_failures(uint8_t esc_index)
 
 	if (esc_report.esc_address < UAVCAN_NODE_ID_MAX && (node_health == dronecan_node_status_s::HEALTH_OK ||
 			node_health == dronecan_node_status_s::HEALTH_WARNING)) {
-		esc_report.failures = 0;
+		failures = 0;
 
-	} else if (strstr(esc_name, "iq_motion") != nullptr && vendor_specific_status_code != 0) {
+	} else if (strstr(esc_name, "iq_motion") != nullptr) {
 		// Parse iq_motion ESC errors
 		static const struct {
 			uint8_t bit;
@@ -231,14 +236,22 @@ uint32_t UavcanEscController::get_failures(uint8_t esc_index)
 
 		for (const auto &mapping : bit_to_failure_map) {
 			if (vendor_specific_status_code & (1 << mapping.bit)) {
-				esc_report.failures |= (1 << mapping.failure_type);
+				failures |= (1 << mapping.failure_type);
 			}
 		}
 
 	} else {
 		// Generic parsing
-		esc_report.failures |= (1 << esc_report_s::FAILURE_GENERIC);
+		failures |= (1 << esc_report_s::FAILURE_GENERIC);
 	}
+	PX4_ERR("STATUS: Name %s, ESC index %u, health %u, vendor code %u, esc_address %u, failures %" PRIu32,
+		esc_name,
+		(unsigned)esc_index,
+		(unsigned)node_health,
+		(unsigned)vendor_specific_status_code,
+		(unsigned)esc_report.esc_address,
+		(uint32_t)failures);
 
-	return esc_report.failures;
+
+	return failures;
 }
