@@ -195,28 +195,21 @@ uint32_t UavcanEscController::get_failures(uint8_t esc_index)
 	uint8_t node_health{dronecan_node_status_s::HEALTH_OK};
 	uint16_t vendor_specific_status_code{0};
 
-	for (auto &dronecan_node_status : _dronecan_node_status_subs) {
-		if (dronecan_node_status.node_id == esc_report.esc_address) {
-			node_health = node_status.health;
-			vendor_specific_status_code = node_status.vendor_specific_status_code;
+	for (auto &dronecan_node_status_sub : _dronecan_node_status_subs) {
+		if (dronecan_node_status_sub.copy(&node_status)) {
+			if (node_status.node_id == esc_report.esc_address) {
+				node_health = node_status.health;
+				vendor_specific_status_code = node_status.vendor_specific_status_code;
+				break;
+			}
 		}
-	}
-
-	if (_dronecan_node_status_sub.copy(&node_status)
-	    && esc_report.esc_address < UAVCAN_NODE_ID_MAX
-	    && node_status.node_id == esc_report.esc_address) {
-		node_health = node_status.health;
-		vendor_specific_status_code = node_status.vendor_specific_status_code;
-
-	} else  {
-		return esc_report.failures;
 	}
 
 	if (esc_report.esc_address < UAVCAN_NODE_ID_MAX && (node_health == dronecan_node_status_s::HEALTH_OK ||
 			node_health == dronecan_node_status_s::HEALTH_WARNING)) {
 		esc_report.failures = 0;
 
-	} else if (strstr(esc_name, "iq_motion") != nullptr) {
+	} else if (strstr(esc_name, "iq_motion") != nullptr && vendor_specific_status_code != 0) {
 		// Parse iq_motion ESC errors
 		static const struct {
 			uint8_t bit;
